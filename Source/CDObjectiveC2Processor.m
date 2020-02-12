@@ -20,6 +20,8 @@
 #import "cd_objc2.h"
 #import "CDProtocolUniquer.h"
 #import "CDOCClassReference.h"
+#import "CDDatabase.h"
+#import "CDOCMethodRuntimeInfo.h"
 
 @implementation CDObjectiveC2Processor
 {
@@ -156,6 +158,9 @@
     //NSLog(@"%016lx %016lx %016lx %016lx", objc2Category.name, objc2Category.class, objc2Category.instanceMethods, objc2Category.classMethods);
     //NSLog(@"%016lx %016lx %016lx %016lx", objc2Category.protocols, objc2Category.instanceProperties, objc2Category.v7, objc2Category.v8);
     
+//    NSDictionary *methodRuntimeDict = [self.machOFile.database runtimeInfoForClass:]
+//    self.machOFile.database
+    
     CDOCCategory *category = [[CDOCCategory alloc] init];
     NSString *str = [self.machOFile stringAtAddress:objc2Category.name];
     [category setName:str];
@@ -256,11 +261,17 @@
     NSString *str = [self.machOFile stringAtAddress:objc2ClassData.name];
     //NSLog(@"name = %@", str);
     
+
+    NSDictionary *runtimeDict = [self.machOFile.database runtimeInfoForClass:str];
+
     CDOCClass *aClass = [[CDOCClass alloc] init];
     [aClass setName:str];
     
-    for (CDOCMethod *method in [self loadMethodsAtAddress:objc2ClassData.baseMethods])
+    for (CDOCMethod *method in [self loadMethodsAtAddress:objc2ClassData.baseMethods]) {
+        CDOCMethodRuntimeInfo *runtimeInfo = [CDDatabase runtimeInfoWithClass:str method:method.name isClassMethod:NO fromDict:runtimeDict];
+        method.runtimeInfo = runtimeInfo;
         [aClass addInstanceMethod:method];
+    }
     
     aClass.instanceVariables = [self loadIvarsAtAddress:objc2ClassData.ivars];
     
@@ -296,7 +307,11 @@
     }
     
     for (CDOCMethod *method in [self loadMethodsOfMetaClassAtAddress:objc2Class.isa])
+    {
+        CDOCMethodRuntimeInfo *runtimeInfo = [CDDatabase runtimeInfoWithClass:str method:method.name isClassMethod:YES fromDict:runtimeDict];
+        method.runtimeInfo = runtimeInfo;
         [aClass addClassMethod:method];
+    }
     
     // Process protocols
     for (CDOCProtocol *protocol in [self.protocolUniquer uniqueProtocolsAtAddresses:[self protocolAddressListAtAddress:objc2ClassData.baseProtocols]])

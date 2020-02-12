@@ -19,6 +19,7 @@
 #import "CDFatFile.h"
 #import "CDFatArch.h"
 #import "CDSearchPathState.h"
+#import "database.h"
 
 void print_usage(void)
 {
@@ -68,6 +69,7 @@ int main(int argc, char *argv[])
         CDArch targetArch;
         BOOL hasSpecifiedArch = NO;
         NSString *outputPath;
+        NSString *dbPath;
         NSMutableSet *hiddenSections = [NSMutableSet set];
 
         int ch;
@@ -78,6 +80,7 @@ int main(int argc, char *argv[])
             { "show-imp-addr",           no_argument,       NULL, 'A' },
             { "match",                   required_argument, NULL, 'C' },
             { "find",                    required_argument, NULL, 'f' },
+            { "database",                required_argument, NULL, 'd' },
             { "generate-multiple-files", no_argument,       NULL, 'H' },
             { "sort-by-inheritance",     no_argument,       NULL, 'I' },
             { "output-dir",              required_argument, NULL, 'o' },
@@ -95,6 +98,18 @@ int main(int argc, char *argv[])
             { NULL,                      0,                 NULL, 0 },
         };
 
+        
+//        NSString *tmpPath = @"/Users/vic/Downloads/method.db";
+//        bool succ = dbOpen(tmpPath.UTF8String);
+//        if (succ) {
+//            NSString *clazz = @"AWEAwemeModel";//AWEVideoModel
+//            CFDictionaryRef methods = dbGetCallStacksWithClass(clazz.UTF8String);
+//            CFRelease(methods);
+//        } else {
+//            NSLog(@"invalid path");
+//        }
+//
+            
         if (argc == 1) {
             print_usage();
             exit(0);
@@ -102,7 +117,7 @@ int main(int argc, char *argv[])
 
         CDClassDump *classDump = [[CDClassDump alloc] init];
 
-        while ( (ch = getopt_long(argc, argv, "aAC:f:HIo:rRsSt", longopts, NULL)) != -1) {
+        while ( (ch = getopt_long(argc, argv, "aAC:f:d:HIo:rRsSt", longopts, NULL)) != -1) {
             switch (ch) {
                 case CD_OPT_ARCH: {
                     NSString *name = [NSString stringWithUTF8String:optarg];
@@ -224,6 +239,10 @@ int main(int argc, char *argv[])
                     classDump.shouldSortMethods = YES;
                     break;
                     
+                case 'd':
+                    dbPath = [NSString stringWithUTF8String:optarg];
+                    break;
+                    
                 case 't':
                     classDump.shouldShowHeader = NO;
                     break;
@@ -302,6 +321,8 @@ int main(int argc, char *argv[])
                 classDump.targetArch = targetArch;
                 classDump.searchPathState.executablePath = [executablePath stringByDeletingLastPathComponent];
 
+                [file prepareDatabaseWithPath:dbPath];
+                
                 NSError *error;
                 if (![classDump loadFile:file error:&error]) {
                     fprintf(stderr, "Error: %s\n", [[error localizedFailureReason] UTF8String]);

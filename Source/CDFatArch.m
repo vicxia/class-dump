@@ -104,6 +104,7 @@
     if (_machOFile == nil) {
         NSData *data = [NSData dataWithBytesNoCopy:((uint8_t *)[self.fatFile.data bytes] + self.offset) length:self.size freeWhenDone:NO];
         _machOFile = [[CDMachOFile alloc] initWithData:data filename:self.fatFile.filename searchPathState:self.fatFile.searchPathState];
+        _machOFile.database = self.fatFile.database;
     }
 
     return _machOFile;

@@ -10,6 +10,8 @@
 #import "CDTypeLexer.h"
 #import "CDTypeParser.h"
 #import "CDTypeController.h"
+#import "CDOCMethodRuntimeInfo.h"
+#import "CDTypeName.h"
 
 static BOOL debug = NO;
 
@@ -252,6 +254,161 @@ static BOOL debug = NO;
         }
     }
 
+    return resultString;
+}
+
+- (NSString *)formatMethodName:(NSString *)methodName typeString:(NSString *)typeString runtimeInfo:(CDOCMethodRuntimeInfo *)runtimeInfo
+{
+    CDTypeParser *parser = [[CDTypeParser alloc] initWithString:typeString];
+
+    NSError *error = nil;
+    NSArray *methodTypes = [parser parseMethodType:&error];
+    if (methodTypes == nil)
+        NSLog(@"Warning: Parsing method types failed, %@", methodName);
+
+    if (methodTypes == nil || [methodTypes count] == 0) {
+        return nil;
+    }
+
+    NSMutableString *resultString = [NSMutableString string];
+    {
+        NSUInteger count = [methodTypes count];
+        NSUInteger index = 0;
+        BOOL noMoreTypes = NO;
+
+        CDMethodType *methodType = methodTypes[index];
+        [resultString appendString:@"("];
+        NSString *specialCase = [self _specialCaseVariable:nil type:methodType.type.bareTypeString];
+        if (specialCase != nil) {
+            [resultString appendString:specialCase];
+        } else {
+            NSString *str = [methodType.type formattedString:nil formatter:self level:0];
+            if (str != nil) {
+                if (runtimeInfo && ([str isEqualToString:@"id"] || [str hasPrefix:@"CDUnknownBlockType"])) {
+                    NSString *runtimeType = [self formatRuntimeTypeString:runtimeInfo.retType];
+                    if (runtimeType) {
+                        str = runtimeType;
+                    }
+                }
+                [resultString appendFormat:@"%@", str];
+            }
+        }
+        [resultString appendString:@")"];
+
+        index += 3;
+
+        NSScanner *scanner = [[NSScanner alloc] initWithString:methodName];
+        while ([scanner isAtEnd] == NO) {
+            NSString *str;
+
+            // We can have unnamed paramenters, :::
+            if ([scanner scanUpToString:@":" intoString:&str]) {
+                //NSLog(@"str += '%@'", str);
+                [resultString appendString:str];
+            }
+            if ([scanner scanString:@":" intoString:NULL]) {
+                [resultString appendString:@":"];
+                if (index >= count) {
+                    noMoreTypes = YES;
+                } else {
+                    methodType = methodTypes[index];
+                    specialCase = [self _specialCaseVariable:nil type:methodType.type.bareTypeString];
+                    if (specialCase != nil) {
+                        [resultString appendFormat:@"(%@)", specialCase];
+                    } else {
+                        NSString *formattedType = [methodType.type formattedString:nil formatter:self level:0];
+                        //if ([[methodType type] isIDType] == NO)
+                        if (runtimeInfo && ([str isEqualToString:@"id"] || [str hasPrefix:@"CDUnknownBlockType"])) {
+                            NSUInteger paramIdx = index - 3;
+                            if (paramIdx < runtimeInfo.paramTypes.count) {
+                                NSString *runtimeType = [self formatRuntimeTypeString:runtimeInfo.paramTypes[paramIdx]];
+                                if (runtimeType) {
+                                    formattedType = runtimeType;
+                                }
+                            }
+                        }
+                        [resultString appendFormat:@"(%@)", formattedType];
+                    }
+                    //[resultString appendFormat:@"fp%@", [methodType offset]];
+                    [resultString appendFormat:@"arg%lu", index-2];
+
+                    NSString *ch = [scanner peekCharacter];
+                    // if next character is not ':' nor EOS then add space
+                    if (ch != nil && [ch isEqual:@":"] == NO)
+                        [resultString appendString:@" "];
+                    index++;
+                }
+            }
+        }
+
+        if (noMoreTypes) {
+            [resultString appendString:@" /* Error: Ran out of types for this method. */"];
+        }
+    }
+
+    return resultString;
+}
+
+- (NSString *)formatRuntimeTypeString:(NSString *)typeString
+{
+    if (typeString.length <= 1) {
+        return nil;
+    }
+    if ([typeString hasPrefix:@"block|"]) {
+        return [self formatBlockFromTypeString:[typeString substringFromIndex:6]];
+    }
+    return [typeString stringByAppendingString:@" *"];
+}
+
+- (NSString *)formatBlockFromTypeString:(NSString *)typeString
+{
+    NSMutableArray *cdTypes = [NSMutableArray array];
+    
+    NSMethodSignature *methodSignature = [NSMethodSignature signatureWithObjCTypes:typeString.UTF8String];
+    const char * retType = methodSignature.methodReturnType;
+    if (strncmp(retType, "@\"<", 3) == 0) { //protocol
+        CDTypeName *cdTypeName = [[CDTypeName alloc] init];
+        cdTypeName.name = [NSString stringWithCString:retType encoding:NSUTF8StringEncoding];
+        cdTypeName.name = [cdTypeName.name substringWithRange:NSMakeRange(2, cdTypeName.name.length - 3)];
+        cdTypeName.name = [@"NSObject" stringByAppendingString:cdTypeName.name];
+        CDType *paramCDType = [[CDType alloc] initIDType:cdTypeName];
+        [cdTypes addObject:paramCDType];
+    } else if (strncmp(retType, "@\"", 2) == 0) {
+        CDTypeName *cdTypeName = [[CDTypeName alloc] init];
+        cdTypeName.name = [NSString stringWithCString:retType encoding:NSUTF8StringEncoding];
+        cdTypeName.name = [cdTypeName.name substringWithRange:NSMakeRange(2, cdTypeName.name.length - 3)];
+        CDType *retCDType = [[CDType alloc] initIDType:cdTypeName];
+        [cdTypes addObject:retCDType];
+    } else {
+        CDType *retCDType = [[CDType alloc] initSimpleType:*retType];
+        [cdTypes addObject:retCDType];
+    }
+
+    // Skip the first argument (self).
+    NSUInteger numOfArgs = methodSignature.numberOfArguments;
+    for (NSUInteger i = 0; i < numOfArgs; ++i) {
+        const char * paramType = [methodSignature getArgumentTypeAtIndex:i];
+        if (strncmp(paramType, "@\"<", 3) == 0) { //protocol
+            CDTypeName *paramTypeName = [[CDTypeName alloc] init];
+            paramTypeName.name = [NSString stringWithCString:paramType encoding:NSUTF8StringEncoding];
+            paramTypeName.name = [paramTypeName.name substringWithRange:NSMakeRange(2, paramTypeName.name.length - 3)];
+            paramTypeName.name = [@"NSObject" stringByAppendingString:paramTypeName.name];
+            CDType *paramCDType = [[CDType alloc] initIDType:paramTypeName];
+            [cdTypes addObject:paramCDType];
+        } else if (strncmp(paramType, "@\"", 2) == 0) {//NSObject
+            CDTypeName *paramTypeName = [[CDTypeName alloc] init];
+            paramTypeName.name = [NSString stringWithCString:paramType encoding:NSUTF8StringEncoding];
+            paramTypeName.name = [paramTypeName.name substringWithRange:NSMakeRange(2, paramTypeName.name.length - 3)];
+            CDType *paramCDType = [[CDType alloc] initIDType:paramTypeName];
+            [cdTypes addObject:paramCDType];
+        } else {
+            CDType *paramCDType = [[CDType alloc] initSimpleType:*paramType];
+            [cdTypes addObject:paramCDType];
+        }
+    }
+    CDType *type = [[CDType alloc] initBlockTypeWithTypes:cdTypes];
+    NSString *resultString = [type formattedString:nil formatter:self level:0];
+    NSLog(@"block: %@", resultString);
     return resultString;
 }
 

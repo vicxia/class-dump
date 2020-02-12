@@ -9,6 +9,7 @@
 #import "CDFatFile.h"
 #import "CDMachOFile.h"
 #import "CDSearchPathState.h"
+#import "CDDatabase.h"
 
 NSString *CDImportNameForPath(NSString *path)
 {
@@ -181,6 +182,11 @@ BOOL CDArchUses64BitLibraries(CDArch arch)
 - (NSString *)architectureNameDescription;
 {
     return nil;
+}
+
+- (void)prepareDatabaseWithPath:(NSString *)dbPath
+{
+    _database = [[CDDatabase alloc] initWithDBPath:dbPath];
 }
 
 @end

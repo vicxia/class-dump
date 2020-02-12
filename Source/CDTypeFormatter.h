@@ -3,7 +3,7 @@
 //  This file is part of class-dump, a utility for examining the Objective-C segment of Mach-O files.
 //  Copyright (C) 1997-2019 Steve Nygard.
 
-@class CDType, CDTypeController;
+@class CDType, CDTypeController, CDOCMethodRuntimeInfo;
 
 @interface CDTypeFormatter : NSObject
 
@@ -16,6 +16,7 @@
 
 - (NSString *)formatVariable:(NSString *)name type:(CDType *)type;
 - (NSString *)formatMethodName:(NSString *)name typeString:(NSString *)typeString;
+- (NSString *)formatMethodName:(NSString *)name typeString:(NSString *)typeString runtimeInfo:(CDOCMethodRuntimeInfo *)runtimeInfo;
 
 - (NSString *)typedefNameForStructure:(CDType *)structureType level:(NSUInteger)level;
 

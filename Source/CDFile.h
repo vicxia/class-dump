@@ -10,7 +10,7 @@ typedef struct {
     cpu_subtype_t cpusubtype;
 } CDArch;
 
-@class CDMachOFile, CDSearchPathState;
+@class CDMachOFile, CDSearchPathState, CDDatabase;
 
 NSString *CDImportNameForPath(NSString *path);
 NSString *CDNameForCPUType(cpu_type_t cputype, cpu_subtype_t cpusubtype);
@@ -28,10 +28,13 @@ BOOL CDArchUses64BitLibraries(CDArch arch);
 @property (readonly) NSString *filename;
 @property (readonly) NSData *data;
 @property (readonly) CDSearchPathState *searchPathState;
+@property (nonatomic, strong) CDDatabase *database;
 
 - (BOOL)bestMatchForLocalArch:(CDArch *)oArchPtr;
 - (BOOL)bestMatchForArch:(CDArch *)ioArchPtr;
 - (CDMachOFile *)machOFileWithArch:(CDArch)arch;
+
+- (void)prepareDatabaseWithPath:(NSString *)dbPath;
 
 @property (nonatomic, readonly) NSString *architectureNameDescription;
 

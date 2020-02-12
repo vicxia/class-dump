@@ -9,6 +9,7 @@
 #import "CDTypeFormatter.h"
 #import "CDTypeParser.h"
 #import "CDTypeController.h"
+#import "CDOCMethodRuntimeInfo.h"
 
 @implementation CDOCMethod
 {
@@ -79,7 +80,7 @@
 
 - (void)appendToString:(NSMutableString *)resultString typeController:(CDTypeController *)typeController;
 {
-    NSString *formattedString = [typeController.methodTypeFormatter formatMethodName:self.name typeString:self.typeString];
+    NSString *formattedString = [typeController.methodTypeFormatter formatMethodName:self.name typeString:self.typeString runtimeInfo:self.runtimeInfo];
     if (formattedString != nil) {
         [resultString appendString:formattedString];
         [resultString appendString:@";"];

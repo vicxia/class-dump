@@ -35,6 +35,8 @@
 
 @property (strong) NSString *sdkRoot;
 
+@property (strong) NSString *dbPath;
+
 @property (readonly) NSArray *machOFiles;
 @property (readonly) NSArray *objcProcessors;
 
